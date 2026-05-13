@@ -1,0 +1,30 @@
+services:
+  agent:
+    build: ./agent
+    container_name: familie-agent
+    restart: unless-stopped
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GOOGLE_CALENDAR_ID=${GOOGLE_CALENDAR_ID}
+      - WHATSAPP_TOKEN=${WHATSAPP_TOKEN}
+      - WHATSAPP_PHONE_ID=${WHATSAPP_PHONE_ID}
+      - WEBHOOK_VERIFY_TOKEN=${WEBHOOK_VERIFY_TOKEN}
+      - FAMILY_NUMBERS=${FAMILY_NUMBERS}
+    volumes:
+      - ./agent/credentials:/app/credentials:ro
+    networks:
+      - familie-net
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: familie-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - agent
+    networks:
+      - familie-net
+
+networks:
+  familie-net:
+    driver: bridge
