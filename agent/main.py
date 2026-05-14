@@ -7,7 +7,8 @@ from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request, Res
 from llm_service import process_message
 from meta_service import download_media, parse_incoming, send_message
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+_log_level = getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO)
+logging.basicConfig(level=_log_level, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
 
 WEBHOOK_VERIFY_TOKEN = os.environ.get("WEBHOOK_VERIFY_TOKEN", "")

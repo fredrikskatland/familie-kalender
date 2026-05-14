@@ -10,6 +10,7 @@ services:
       - WHATSAPP_PHONE_ID=${WHATSAPP_PHONE_ID}
       - WEBHOOK_VERIFY_TOKEN=${WEBHOOK_VERIFY_TOKEN}
       - FAMILY_NUMBERS=${FAMILY_NUMBERS}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
       - ./agent/credentials:/app/credentials:ro
       - ./agent/system_prompt.md:/app/system_prompt.md

@@ -100,6 +100,24 @@ Boten svarer på norsk og er proaktiv – oppretter hendelser uten å spørre om
 
 ---
 
+## Logging og debugging
+
+Stream live-logger fra agenten:
+
+```bash
+docker compose logs -f agent
+```
+
+For å se prompts, tool-argumenter og svar – sett `LOG_LEVEL=DEBUG` i `.env` og restart:
+
+```bash
+docker compose up -d
+```
+
+Tilbake til normal: sett `LOG_LEVEL=INFO`.
+
+---
+
 ## Filstruktur
 
 ```text

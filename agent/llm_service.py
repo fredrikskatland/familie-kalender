@@ -143,25 +143,28 @@ def _build_content(text: str, media) -> list:
 
 def _handle_tool_call(tool_name: str, tool_input: dict) -> str:
     try:
+        logger.debug("Tool call: %s args=%s", tool_name, json.dumps(tool_input, ensure_ascii=False))
         if tool_name == "create_event":
             person = tool_input.pop("person", "Alle")
             tool_input["color_id"] = PERSON_COLORS.get(person, "1")
             event = calendar.create_event(**tool_input)
-            return json.dumps({"status": "ok", "event_id": event["id"], "link": event.get("htmlLink", "")})
+            result = json.dumps({"status": "ok", "event_id": event["id"], "link": event.get("htmlLink", "")})
         elif tool_name == "update_event":
             person = tool_input.pop("person", None)
             if person:
                 tool_input["color_id"] = PERSON_COLORS.get(person)
             event = calendar.update_event(**tool_input)
-            return json.dumps({"status": "ok", "event_id": event["id"]})
+            result = json.dumps({"status": "ok", "event_id": event["id"]})
         elif tool_name == "delete_event":
             calendar.delete_event(tool_input["event_id"])
-            return json.dumps({"status": "ok"})
+            result = json.dumps({"status": "ok"})
         elif tool_name == "list_events":
             events = calendar.list_events(days_ahead=tool_input.get("days_ahead", 14))
-            return json.dumps({"events": events})
+            result = json.dumps({"events": events})
         else:
-            return json.dumps({"error": f"Ukjent verktøy: {tool_name}"})
+            result = json.dumps({"error": f"Ukjent verktøy: {tool_name}"})
+        logger.debug("Tool result: %s", result)
+        return result
     except Exception as e:
         logger.exception("Feil i verktøy %s", tool_name)
         return json.dumps({"error": str(e)})
@@ -170,9 +173,11 @@ def _handle_tool_call(tool_name: str, tool_input: dict) -> str:
 async def process_message(sender: str, text: str, media) -> str:
     today = date.today().isoformat()
     system = _load_system_prompt().format(today=today)
+    logger.debug("System prompt:\n%s", system)
 
     # Bygg ny brukermelding
     user_content = _build_content(text, media)
+    logger.debug("Brukermelding fra %s: %s", sender, text[:500])
     _history.append({"role": "user", "content": user_content})
 
     # Sett sammen komplett meldingsliste: system + historikk
@@ -191,7 +196,7 @@ async def process_message(sender: str, text: str, media) -> str:
 
         if response.choices[0].finish_reason == "stop":
             reply = msg.content or "Ferdig."
-            # Lagre assistentsvaret i historikken
+            logger.debug("Assistentsvar: %s", reply)
             _history.append({"role": "assistant", "content": reply})
             return reply
 
