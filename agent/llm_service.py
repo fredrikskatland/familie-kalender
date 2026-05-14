@@ -5,7 +5,6 @@ import logging
 import os
 from collections import deque
 from datetime import date
-from typing import Optional
 
 from openai import OpenAI
 from pdf2image import convert_from_bytes
@@ -23,22 +22,22 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 # Delt konversasjonshistorikk for gruppen (maks 20 meldingspar)
 _history: deque = deque(maxlen=20)
 
-SYSTEM_PROMPT = """Du er en familiekalender-assistent for en norsk familie med barn i skole og barnehage. Dagens dato er {today}.
+# Familiemedlemmer og tilhørende Google Calendar colorId
+PERSON_COLORS = {
+    "Fredrik": "9",   # Blueberry (blå)
+    "Sarah": "4",     # Flamingo (rosa)
+    "Lotta": "5",     # Banana (gul)
+    "Morten": "2",    # Sage (grønn)
+    "Alle": "1",      # Lavender (lilla)
+}
+COLOR_PERSON = {v: k for k, v in PERSON_COLORS.items()}
 
-## Oppførsel
-- Anta ALLTID at meldinger handler om å opprette kalender-hendelser – ikke spør om bekreftelse, bare gjør det.
-- Opprett hendelser umiddelbart. Svar kort (én setning) hva du la inn.
-- Hvis du mottar et bilde eller PDF: les det nøye og opprett ALLE hendelser du finner. Ikke spør om tillatelse.
-- Hvis en dato mangler år, bruk inneværende eller neste år avhengig av hvilken som er fremtidig.
-- Spør KUN hvis dato/tidspunkt er fullstendig fraværende og ikke kan gjettes.
-- Hvis noen spør "hva skjer?" eller "vis kalender", list opp hendelser.
-- Svar alltid på norsk, kort og konsist.
+PROMPT_FILE = os.path.join(os.path.dirname(__file__), "system_prompt.md")
 
-## Eksempler på riktig oppførsel
-- "Fotballtrening fredag 17-18" → opprett hendelse, svar "Lagt inn: Fotballtrening fredag kl 17-18."
-- Bilde av terminliste → opprett alle datoer du ser, svar "Lagt inn 5 hendelser fra terminlisten."
-- "Hva skjer denne uken?" → list hendelser
-"""
+
+def _load_system_prompt() -> str:
+    with open(PROMPT_FILE, encoding="utf-8") as f:
+        return f.read()
 
 TOOLS = [
     {
@@ -52,10 +51,11 @@ TOOLS = [
                     "title": {"type": "string", "description": "Tittel på hendelsen"},
                     "start_datetime": {"type": "string", "description": "Starttidspunkt i ISO 8601-format, f.eks. 2025-06-15T09:00:00"},
                     "end_datetime": {"type": "string", "description": "Sluttidspunkt i ISO 8601-format"},
+                    "person": {"type": "string", "enum": ["Fredrik", "Sarah", "Lotta", "Morten", "Alle"], "description": "Hvem hendelsen gjelder"},
                     "description": {"type": "string", "description": "Valgfri beskrivelse eller notater"},
                     "location": {"type": "string", "description": "Valgfri lokasjon"},
                 },
-                "required": ["title", "start_datetime", "end_datetime"],
+                "required": ["title", "start_datetime", "end_datetime", "person"],
             },
         },
     },
@@ -71,6 +71,7 @@ TOOLS = [
                     "title": {"type": "string"},
                     "start_datetime": {"type": "string"},
                     "end_datetime": {"type": "string"},
+                    "person": {"type": "string", "enum": ["Fredrik", "Sarah", "Lotta", "Morten", "Alle"]},
                     "description": {"type": "string"},
                     "location": {"type": "string"},
                 },
@@ -143,9 +144,14 @@ def _build_content(text: str, media) -> list:
 def _handle_tool_call(tool_name: str, tool_input: dict) -> str:
     try:
         if tool_name == "create_event":
+            person = tool_input.pop("person", "Alle")
+            tool_input["color_id"] = PERSON_COLORS.get(person, "1")
             event = calendar.create_event(**tool_input)
             return json.dumps({"status": "ok", "event_id": event["id"], "link": event.get("htmlLink", "")})
         elif tool_name == "update_event":
+            person = tool_input.pop("person", None)
+            if person:
+                tool_input["color_id"] = PERSON_COLORS.get(person)
             event = calendar.update_event(**tool_input)
             return json.dumps({"status": "ok", "event_id": event["id"]})
         elif tool_name == "delete_event":
@@ -163,7 +169,7 @@ def _handle_tool_call(tool_name: str, tool_input: dict) -> str:
 
 async def process_message(sender: str, text: str, media) -> str:
     today = date.today().isoformat()
-    system = SYSTEM_PROMPT.format(today=today)
+    system = _load_system_prompt().format(today=today)
 
     # Bygg ny brukermelding
     user_content = _build_content(text, media)

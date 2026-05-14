@@ -12,6 +12,7 @@ services:
       - FAMILY_NUMBERS=${FAMILY_NUMBERS}
     volumes:
       - ./agent/credentials:/app/credentials:ro
+      - ./agent/system_prompt.md:/app/system_prompt.md
     networks:
       - familie-net
 

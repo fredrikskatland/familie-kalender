@@ -27,6 +27,7 @@ class CalendarService:
         end_datetime: str,
         description: str = "",
         location: str = "",
+        color_id: str = None,
     ) -> dict:
         event = {
             "summary": title,
@@ -35,6 +36,8 @@ class CalendarService:
             "start": {"dateTime": start_datetime, "timeZone": TIMEZONE},
             "end": {"dateTime": end_datetime, "timeZone": TIMEZONE},
         }
+        if color_id:
+            event["colorId"] = color_id
         result = self._service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
         logger.info("Opprettet hendelse: %s (id=%s)", title, result["id"])
         return result
@@ -52,6 +55,8 @@ class CalendarService:
             existing["start"] = {"dateTime": kwargs["start_datetime"], "timeZone": TIMEZONE}
         if "end_datetime" in kwargs:
             existing["end"] = {"dateTime": kwargs["end_datetime"], "timeZone": TIMEZONE}
+        if "color_id" in kwargs and kwargs["color_id"]:
+            existing["colorId"] = kwargs["color_id"]
 
         result = (
             self._service.events()
@@ -93,5 +98,6 @@ class CalendarService:
                 "end": end,
                 "description": item.get("description", ""),
                 "location": item.get("location", ""),
+                "colorId": item.get("colorId", ""),
             })
         return events
