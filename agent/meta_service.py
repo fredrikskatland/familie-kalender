@@ -94,5 +94,6 @@ def parse_incoming(data: dict) -> list[dict]:
                     "text": text,
                     "media_id": media_id,
                     "mime_type": mime_type,
+                    "message_id": msg.get("id"),
                 })
     return messages

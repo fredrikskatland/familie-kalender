@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import io
 import json
@@ -21,6 +22,7 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Delt konversasjonshistorikk for gruppen (maks 20 meldingspar)
 _history: deque = deque(maxlen=20)
+_lock = asyncio.Lock()
 
 # Familiemedlemmer og tilhørende Google Calendar colorId
 PERSON_COLORS = {
@@ -49,8 +51,8 @@ TOOLS = [
                 "type": "object",
                 "properties": {
                     "title": {"type": "string", "description": "Tittel på hendelsen"},
-                    "start_datetime": {"type": "string", "description": "Starttidspunkt i ISO 8601-format, f.eks. 2025-06-15T09:00:00"},
-                    "end_datetime": {"type": "string", "description": "Sluttidspunkt i ISO 8601-format"},
+                    "start_datetime": {"type": "string", "description": "Starttidspunkt: YYYY-MM-DDTHH:MM:SS for tidspunkt, eller YYYY-MM-DD for heldagshendelse"},
+                    "end_datetime": {"type": "string", "description": "Sluttidspunkt: samme format som start_datetime. For heldagshendelse: dagen etter (eksklusiv slutt)"},
                     "person": {"type": "string", "enum": ["Fredrik", "Sarah", "Lotta", "Morten", "Alle"], "description": "Hvem hendelsen gjelder"},
                     "description": {"type": "string", "description": "Valgfri beskrivelse eller notater"},
                     "location": {"type": "string", "description": "Valgfri lokasjon"},
@@ -171,6 +173,11 @@ def _handle_tool_call(tool_name: str, tool_input: dict) -> str:
 
 
 async def process_message(sender: str, text: str, media) -> str:
+    async with _lock:
+        return await _process_message(sender, text, media)
+
+
+async def _process_message(sender: str, text: str, media) -> str:
     today = date.today().isoformat()
     system = _load_system_prompt().format(today=today)
     logger.debug("System prompt:\n%s", system)
@@ -196,7 +203,7 @@ async def process_message(sender: str, text: str, media) -> str:
 
         if response.choices[0].finish_reason == "stop":
             reply = msg.content or "Ferdig."
-            logger.debug("Assistentsvar: %s", reply)
+            logger.info("Assistentsvar: %s", reply)
             _history.append({"role": "assistant", "content": reply})
             return reply
 

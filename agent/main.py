@@ -1,6 +1,7 @@
 import base64
 import logging
 import os
+from collections import deque
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request, Response
 
@@ -13,6 +14,9 @@ logger = logging.getLogger(__name__)
 
 WEBHOOK_VERIFY_TOKEN = os.environ.get("WEBHOOK_VERIFY_TOKEN", "")
 FAMILY_NUMBERS = [n.strip() for n in os.environ.get("FAMILY_NUMBERS", "").split(",") if n.strip()]
+
+# Deduplisering: hold styr på de siste 200 prosesserte meldings-IDer
+_seen_message_ids: deque = deque(maxlen=200)
 
 app = FastAPI(title="Familie Kalender Agent")
 
@@ -54,6 +58,13 @@ async def handle_messages(data: dict) -> None:
         text = msg["text"]
         media_id = msg["media_id"]
         mime_type = msg["mime_type"]
+        message_id = msg.get("message_id")
+
+        if message_id:
+            if message_id in _seen_message_ids:
+                logger.debug("Duplikat melding ignorert: %s", message_id)
+                continue
+            _seen_message_ids.append(message_id)
 
         logger.info("Melding fra %s: '%s' media=%s", sender, text[:80], bool(media_id))
 

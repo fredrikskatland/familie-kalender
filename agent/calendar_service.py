@@ -13,6 +13,13 @@ CALENDAR_ID = os.environ.get("GOOGLE_CALENDAR_ID", "primary")
 TIMEZONE = "Europe/Oslo"
 
 
+def _make_time(dt_str: str) -> dict:
+    """Støtter både heldagshendelser (YYYY-MM-DD) og tidspunkt (YYYY-MM-DDTHH:MM:SS)."""
+    if "T" in dt_str:
+        return {"dateTime": dt_str, "timeZone": TIMEZONE}
+    return {"date": dt_str}
+
+
 class CalendarService:
     def __init__(self):
         creds = service_account.Credentials.from_service_account_file(
@@ -33,8 +40,8 @@ class CalendarService:
             "summary": title,
             "description": description,
             "location": location,
-            "start": {"dateTime": start_datetime, "timeZone": TIMEZONE},
-            "end": {"dateTime": end_datetime, "timeZone": TIMEZONE},
+            "start": _make_time(start_datetime),
+            "end": _make_time(end_datetime),
         }
         if color_id:
             event["colorId"] = color_id
@@ -52,9 +59,9 @@ class CalendarService:
         if "location" in kwargs:
             existing["location"] = kwargs["location"]
         if "start_datetime" in kwargs:
-            existing["start"] = {"dateTime": kwargs["start_datetime"], "timeZone": TIMEZONE}
+            existing["start"] = _make_time(kwargs["start_datetime"])
         if "end_datetime" in kwargs:
-            existing["end"] = {"dateTime": kwargs["end_datetime"], "timeZone": TIMEZONE}
+            existing["end"] = _make_time(kwargs["end_datetime"])
         if "color_id" in kwargs and kwargs["color_id"]:
             existing["colorId"] = kwargs["color_id"]
 
