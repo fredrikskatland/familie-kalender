@@ -15,7 +15,7 @@ from calendar_service import CalendarService
 logger = logging.getLogger(__name__)
 
 OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
-MODEL = "gpt-4o"
+MODEL = "gpt-5"
 
 calendar = CalendarService()
 client = OpenAI(api_key=OPENAI_API_KEY)
@@ -56,6 +56,9 @@ TOOLS = [
                     "person": {"type": "string", "enum": ["Fredrik", "Sarah", "Lotta", "Morten", "Alle"], "description": "Hvem hendelsen gjelder"},
                     "description": {"type": "string", "description": "Valgfri beskrivelse eller notater"},
                     "location": {"type": "string", "description": "Valgfri lokasjon"},
+                    "recurrence_frequency": {"type": "string", "enum": ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"], "description": "Gjentakelsesfrekvens for hendelsen"},
+                    "recurrence_until": {"type": "string", "description": "Sluttdato for gjentakelse, YYYY-MM-DD. Bruk enten denne eller recurrence_count."},
+                    "recurrence_count": {"type": "integer", "description": "Antall ganger hendelsen skal gjenta seg"},
                 },
                 "required": ["title", "start_datetime", "end_datetime", "person"],
             },
@@ -149,6 +152,9 @@ def _handle_tool_call(tool_name: str, tool_input: dict) -> str:
         if tool_name == "create_event":
             person = tool_input.pop("person", "Alle")
             tool_input["color_id"] = PERSON_COLORS.get(person, "1")
+            tool_input["recurrence_frequency"] = tool_input.pop("recurrence_frequency", None)
+            tool_input["recurrence_until"] = tool_input.pop("recurrence_until", None)
+            tool_input["recurrence_count"] = tool_input.pop("recurrence_count", None)
             event = calendar.create_event(**tool_input)
             result = json.dumps({"status": "ok", "event_id": event["id"], "link": event.get("htmlLink", "")})
         elif tool_name == "update_event":

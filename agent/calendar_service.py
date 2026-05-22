@@ -35,6 +35,9 @@ class CalendarService:
         description: str = "",
         location: str = "",
         color_id: str = None,
+        recurrence_frequency: str = None,
+        recurrence_until: str = None,
+        recurrence_count: int = None,
     ) -> dict:
         event = {
             "summary": title,
@@ -45,6 +48,13 @@ class CalendarService:
         }
         if color_id:
             event["colorId"] = color_id
+        if recurrence_frequency:
+            rrule = f"RRULE:FREQ={recurrence_frequency}"
+            if recurrence_until:
+                rrule += f";UNTIL={recurrence_until.replace('-', '')}T000000Z"
+            elif recurrence_count:
+                rrule += f";COUNT={recurrence_count}"
+            event["recurrence"] = [rrule]
         result = self._service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
         logger.info("Opprettet hendelse: %s (id=%s)", title, result["id"])
         return result
