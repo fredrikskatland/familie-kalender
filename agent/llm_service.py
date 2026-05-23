@@ -201,7 +201,7 @@ async def _process_message(sender: str, text: str, media) -> str:
             model=MODEL,
             messages=messages,
             tools=TOOLS,
-            max_tokens=2048,
+            max_completion_tokens=2048,
         )
 
         msg = response.choices[0].message
