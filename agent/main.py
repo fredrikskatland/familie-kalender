@@ -1,10 +1,13 @@
+import asyncio
 import base64
 import logging
 import os
 from collections import deque
+from contextlib import asynccontextmanager
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request, Response
 
+from daily_summary import daily_summary_loop
 from llm_service import process_message
 from meta_service import download_media, parse_incoming, send_message
 
@@ -18,7 +21,12 @@ FAMILY_NUMBERS = [n.strip() for n in os.environ.get("FAMILY_NUMBERS", "").split(
 # Deduplisering: hold styr på de siste 200 prosesserte meldings-IDer
 _seen_message_ids: deque = deque(maxlen=200)
 
-app = FastAPI(title="Familie Kalender Agent")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    asyncio.create_task(daily_summary_loop())
+    yield
+
+app = FastAPI(title="Familie Kalender Agent", lifespan=lifespan)
 
 
 @app.get("/health")

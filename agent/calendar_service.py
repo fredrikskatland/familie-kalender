@@ -87,15 +87,16 @@ class CalendarService:
         self._service.events().delete(calendarId=CALENDAR_ID, eventId=event_id).execute()
         logger.info("Slettet hendelse id=%s", event_id)
 
-    def list_events(self, days_ahead: int = 14) -> list[dict]:
+    def list_events(self, days_ahead: int = 14, days_from: int = 0) -> list[dict]:
         now = datetime.now(timezone.utc)
-        time_max = now + timedelta(days=days_ahead)
+        time_min = now + timedelta(days=days_from)
+        time_max = now + timedelta(days=days_from + days_ahead)
 
         result = (
             self._service.events()
             .list(
                 calendarId=CALENDAR_ID,
-                timeMin=now.isoformat(),
+                timeMin=time_min.isoformat(),
                 timeMax=time_max.isoformat(),
                 singleEvents=True,
                 orderBy="startTime",

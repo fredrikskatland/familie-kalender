@@ -11,9 +11,11 @@ services:
       - WEBHOOK_VERIFY_TOKEN=${WEBHOOK_VERIFY_TOKEN}
       - FAMILY_NUMBERS=${FAMILY_NUMBERS}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DAILY_SUMMARY_TIME=${DAILY_SUMMARY_TIME:-20:00}
     volumes:
       - ./agent/credentials:/app/credentials:ro
       - ./agent/system_prompt.md:/app/system_prompt.md
+      - ./agent/daily_summary_prompt.md:/app/daily_summary_prompt.md
     networks:
       - familie-net
 
