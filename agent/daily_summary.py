@@ -73,7 +73,7 @@ async def send_daily_summary():
     response = client.chat.completions.create(
         model=MODEL,
         messages=[{"role": "user", "content": prompt}],
-        max_completion_tokens=512,
+        max_completion_tokens=2048,
     )
 
     message = response.choices[0].message.content or ""
