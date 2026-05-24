@@ -76,7 +76,14 @@ async def send_daily_summary():
         max_completion_tokens=512,
     )
 
-    message = response.choices[0].message.content
+    message = response.choices[0].message.content or ""
+    if not message.strip():
+        logger.error(
+            "Daglig oppsummering: tomt svar fra modellen (finish_reason=%s)",
+            response.choices[0].finish_reason,
+        )
+        return
+
     logger.info("Daglig oppsummering: %s", message[:120])
 
     for number in FAMILY_NUMBERS:
