@@ -16,6 +16,7 @@ services:
       - ./agent/credentials:/app/credentials:ro
       - ./agent/system_prompt.md:/app/system_prompt.md
       - ./agent/daily_summary_prompt.md:/app/daily_summary_prompt.md
+      - ./agent/memory:/app/memory
     networks:
       - familie-net
 

@@ -20,8 +20,6 @@ MODEL = "gpt-5"
 calendar = CalendarService()
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-# Delt konversasjonshistorikk for gruppen (maks 20 meldingspar)
-_history: deque = deque(maxlen=20)
 _lock = asyncio.Lock()
 
 # Familiemedlemmer og tilhørende Google Calendar colorId
@@ -35,11 +33,92 @@ PERSON_COLORS = {
 COLOR_PERSON = {v: k for k, v in PERSON_COLORS.items()}
 
 PROMPT_FILE = os.path.join(os.path.dirname(__file__), "system_prompt.md")
+MEMORY_DIR = os.path.join(os.path.dirname(__file__), "memory")
+FACTS_FILE = os.path.join(MEMORY_DIR, "facts.md")
+HISTORY_FILE = os.path.join(MEMORY_DIR, "history.json")
+
+os.makedirs(MEMORY_DIR, exist_ok=True)
+
+
+# --- Langtidsminne (facts.md) ---
+
+def _load_facts() -> str:
+    if not os.path.exists(FACTS_FILE):
+        return ""
+    with open(FACTS_FILE, encoding="utf-8") as f:
+        return f.read().strip()
+
+
+def _save_fact(person: str, fact: str) -> None:
+    existing = ""
+    if os.path.exists(FACTS_FILE):
+        with open(FACTS_FILE, encoding="utf-8") as f:
+            existing = f.read()
+
+    section = f"## {person}"
+    entry = f"- {fact}"
+
+    if section in existing:
+        idx = existing.index(section) + len(section)
+        next_sec = existing.find("\n## ", idx)
+        insert_at = next_sec if next_sec != -1 else len(existing)
+        block = existing[idx:insert_at].rstrip()
+        existing = existing[:idx] + block + f"\n{entry}\n" + existing[insert_at:]
+    else:
+        existing = existing.rstrip() + f"\n\n{section}\n{entry}\n"
+
+    with open(FACTS_FILE, "w", encoding="utf-8") as f:
+        f.write(existing.lstrip())
+
+
+# --- Kortidsminne / samtalehistorikk (history.json) ---
+
+def _load_history_from_disk() -> list:
+    if not os.path.exists(HISTORY_FILE):
+        return []
+    try:
+        with open(HISTORY_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        logger.warning("Kunne ikke laste konversasjonshistorikk fra disk")
+        return []
+
+
+def _save_history_to_disk(history: deque) -> None:
+    # Strip base64-media fra bruker-meldinger før lagring
+    serializable = []
+    for msg in history:
+        if msg["role"] == "user":
+            content = msg["content"]
+            if isinstance(content, list):
+                text_parts = [p for p in content if p.get("type") == "text"]
+                serializable.append({
+                    "role": "user",
+                    "content": text_parts if text_parts else [{"type": "text", "text": "[media]"}],
+                })
+            else:
+                serializable.append(msg)
+        else:
+            serializable.append(msg)
+    try:
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(serializable, f, ensure_ascii=False, indent=2)
+    except Exception:
+        logger.warning("Kunne ikke lagre konversasjonshistorikk til disk")
+
+
+# Delt konversasjonshistorikk (maks 20 meldingspar), lastet fra disk ved oppstart
+_history: deque = deque(_load_history_from_disk(), maxlen=20)
 
 
 def _load_system_prompt() -> str:
     with open(PROMPT_FILE, encoding="utf-8") as f:
-        return f.read()
+        prompt = f.read()
+    facts = _load_facts()
+    if facts:
+        prompt += f"\n\n---\n\n## Langtidsminne – kjent om familien\n\n{facts}"
+    return prompt
+
 
 TOOLS = [
     {
@@ -111,6 +190,33 @@ TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "save_memory",
+            "description": (
+                "Lagre et faktum om familien til langtidsminnet. Bruk dette proaktivt når du "
+                "lærer noe stabilt og gjenbrukbart: faste aktiviteter og rutiner, "
+                "skole/barnehage-informasjon, allergier, preferanser, faste hente- og leveringstider. "
+                "Skriv faktum presist og kortfattet."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "person": {
+                        "type": "string",
+                        "enum": ["Fredrik", "Sarah", "Lotta", "Morten", "Generelt"],
+                        "description": "Hvem faktumet gjelder",
+                    },
+                    "fact": {
+                        "type": "string",
+                        "description": "Faktum som skal huskes, f.eks. 'Fotballag: Stjernene FK, trening tirsdager 17-18'",
+                    },
+                },
+                "required": ["person", "fact"],
+            },
+        },
+    },
 ]
 
 
@@ -169,6 +275,10 @@ def _handle_tool_call(tool_name: str, tool_input: dict) -> str:
         elif tool_name == "list_events":
             events = calendar.list_events(days_ahead=tool_input.get("days_ahead", 14))
             result = json.dumps({"events": events})
+        elif tool_name == "save_memory":
+            _save_fact(tool_input["person"], tool_input["fact"])
+            logger.info("Minne lagret – %s: %s", tool_input["person"], tool_input["fact"])
+            result = json.dumps({"status": "ok"})
         else:
             result = json.dumps({"error": f"Ukjent verktøy: {tool_name}"})
         logger.debug("Tool result: %s", result)
@@ -211,6 +321,7 @@ async def _process_message(sender: str, text: str, media) -> str:
             reply = msg.content or "Ferdig."
             logger.info("Assistentsvar: %s", reply)
             _history.append({"role": "assistant", "content": reply})
+            _save_history_to_disk(_history)
             return reply
 
         if response.choices[0].finish_reason == "tool_calls":
