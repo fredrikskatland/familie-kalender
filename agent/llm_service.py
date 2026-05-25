@@ -311,7 +311,6 @@ async def _process_message(sender: str, text: str, media) -> str:
             model=MODEL,
             messages=messages,
             tools=TOOLS,
-            max_completion_tokens=4096,
         )
 
         finish_reason = response.choices[0].finish_reason
