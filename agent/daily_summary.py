@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 from llm_service import MODEL, client
 from calendar_service import CalendarService
 from meta_service import send_message
+from weather_service import get_weather
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,13 @@ async def send_daily_summary():
     events = calendar.list_events(days_from=1, days_ahead=days_ahead)
     events_text = json.dumps(events, ensure_ascii=False, indent=2) if events else "Ingen hendelser registrert."
 
-    prompt = _load_prompt().format(period_label=period_label, events_json=events_text)
+    weather_text = get_weather(days_ahead=days_ahead)
+
+    prompt = _load_prompt().format(
+        period_label=period_label,
+        events_json=events_text,
+        weather=weather_text or "Ingen værdata tilgjengelig.",
+    )
 
     response = client.chat.completions.create(
         model=MODEL,

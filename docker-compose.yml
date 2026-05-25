@@ -12,6 +12,8 @@ services:
       - FAMILY_NUMBERS=${FAMILY_NUMBERS}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DAILY_SUMMARY_TIME=${DAILY_SUMMARY_TIME:-20:00}
+      - WEATHER_LAT=${WEATHER_LAT:-59.928}
+      - WEATHER_LON=${WEATHER_LON:-11.173}
     volumes:
       - ./agent/credentials:/app/credentials:ro
       - ./agent/system_prompt.md:/app/system_prompt.md
