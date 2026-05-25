@@ -8,6 +8,9 @@ Her er hendelsene som er registrert:
 Været {period_label}:
 {weather}
 
+Kjent om familien (langtidsminne):
+{facts}
+
 Regler:
 - Nevn kun hendelser som faktisk er i kalenderen – ikke kommenter fravær av hendelser for enkeltpersoner
 - Avslutt alltid med én setning om været, inkluder emoji fra værmeldingen (f.eks. ☀️, 🌧️, ⛅)

@@ -49,6 +49,11 @@ def _load_facts() -> str:
         return f.read().strip()
 
 
+def get_facts() -> str:
+    """Returnerer lagrede fakta om familien (til bruk i andre moduler)."""
+    return _load_facts()
+
+
 def _save_fact(person: str, fact: str) -> None:
     existing = ""
     if os.path.exists(FACTS_FILE):
