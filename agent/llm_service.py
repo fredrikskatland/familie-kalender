@@ -311,20 +311,21 @@ async def _process_message(sender: str, text: str, media) -> str:
             model=MODEL,
             messages=messages,
             tools=TOOLS,
-            max_completion_tokens=2048,
+            max_completion_tokens=4096,
         )
 
+        finish_reason = response.choices[0].finish_reason
         msg = response.choices[0].message
         messages.append(msg)
 
-        if response.choices[0].finish_reason == "stop":
+        if finish_reason == "stop":
             reply = msg.content or "Ferdig."
             logger.info("Assistentsvar: %s", reply)
             _history.append({"role": "assistant", "content": reply})
             _save_history_to_disk(_history)
             return reply
 
-        if response.choices[0].finish_reason == "tool_calls":
+        if finish_reason == "tool_calls":
             for tool_call in msg.tool_calls:
                 tool_input = json.loads(tool_call.function.arguments)
                 logger.info("Kaller verktøy: %s med %s", tool_call.function.name, tool_input)
@@ -335,6 +336,7 @@ async def _process_message(sender: str, text: str, media) -> str:
                     "content": result,
                 })
         else:
+            logger.error("Uventet finish_reason fra modellen: %s — avbryter", finish_reason)
             break
 
     return "Beklager, jeg klarte ikke å fullføre forespørselen."
