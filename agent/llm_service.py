@@ -317,6 +317,22 @@ async def _process_message(sender: str, text: str, media) -> str:
         msg = response.choices[0].message
         messages.append(msg)
 
+        # Logg token-bruk og reasoning hvis tilgjengelig
+        usage = response.usage
+        if usage:
+            details = getattr(usage, "completion_tokens_details", None)
+            reasoning_tokens = getattr(details, "reasoning_tokens", None)
+            text_tokens = getattr(details, "text_tokens", None)
+            logger.info(
+                "Token-bruk — total: %s, reasoning: %s, output: %s",
+                usage.completion_tokens,
+                reasoning_tokens if reasoning_tokens is not None else "?",
+                text_tokens if text_tokens is not None else "?",
+            )
+        reasoning = getattr(msg, "reasoning_content", None)
+        if reasoning:
+            logger.debug("Reasoning: %s", reasoning[:1000])
+
         if finish_reason == "stop":
             reply = msg.content or "Ferdig."
             logger.info("Assistentsvar: %s", reply)
